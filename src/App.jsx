@@ -49,56 +49,102 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {/* Header */}
       <header className="bg-blue-600 text-white shadow-lg">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex justify-between items-center flex-wrap gap-4">
+          <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
-              <h1 className="text-xl md:text-2xl font-bold">Sistema de Mantenimiento AC</h1>
+              <h1 className="text-2xl font-bold">Sistema de Mantenimiento AC</h1>
               {!isOnline && (
                 <span className="bg-yellow-500 text-white px-3 py-1 rounded-full text-sm">
-                  Offline
+                  Modo Offline
                 </span>
               )}
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm">{user?.username} ({user?.role})</span>
+              <span className="text-sm">
+                {user?.username} ({user?.role})
+              </span>
               <button
                 onClick={handleLogout}
                 className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded transition"
               >
-                Salir
+                Cerrar Sesión
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="flex flex-col md:flex-row">
-        <nav className="w-full md:w-64 bg-white shadow-lg">
+      <div className="flex">
+        {/* Sidebar */}
+        <nav className="w-64 bg-white shadow-lg min-h-screen">
           <ul className="py-4">
-            {[
-              { view: 'dashboard', label: '📊 Dashboard' },
-              { view: 'work-orders', label: '📋 Órdenes' },
-              { view: 'schedule', label: '📅 Agenda' },
-              { view: 'technicians', label: '👷 Técnicos' },
-              { view: 'clients', label: '👥 Clientes' },
-              { view: 'materials', label: '📦 Materiales' }
-            ].map(item => (
-              <li key={item.view}>
-                <button
-                  onClick={() => setCurrentView(item.view)}
-                  className={`w-full text-left px-6 py-3 hover:bg-blue-50 transition ${
-                    currentView === item.view ? 'bg-blue-100 border-l-4 border-blue-600' : ''
-                  }`}
-                >
-                  {item.label}
-                </button>
-              </li>
-            ))}
+            <li>
+              <button
+                onClick={() => setCurrentView('dashboard')}
+                className={`w-full text-left px-6 py-3 hover:bg-blue-50 transition ${
+                  currentView === 'dashboard' ? 'bg-blue-100 border-l-4 border-blue-600' : ''
+                }`}
+              >
+                📊 Dashboard
+              </button>
+            </li>
+            <li>
+              <button
+                onClick={() => setCurrentView('work-orders')}
+                className={`w-full text-left px-6 py-3 hover:bg-blue-50 transition ${
+                  currentView === 'work-orders' ? 'bg-blue-100 border-l-4 border-blue-600' : ''
+                }`}
+              >
+                📋 Órdenes de Trabajo
+              </button>
+            </li>
+            <li>
+              <button
+                onClick={() => setCurrentView('schedule')}
+                className={`w-full text-left px-6 py-3 hover:bg-blue-50 transition ${
+                  currentView === 'schedule' ? 'bg-blue-100 border-l-4 border-blue-600' : ''
+                }`}
+              >
+                📅 Agenda
+              </button>
+            </li>
+            <li>
+              <button
+                onClick={() => setCurrentView('technicians')}
+                className={`w-full text-left px-6 py-3 hover:bg-blue-50 transition ${
+                  currentView === 'technicians' ? 'bg-blue-100 border-l-4 border-blue-600' : ''
+                }`}
+              >
+                👷 Técnicos
+              </button>
+            </li>
+            <li>
+              <button
+                onClick={() => setCurrentView('clients')}
+                className={`w-full text-left px-6 py-3 hover:bg-blue-50 transition ${
+                  currentView === 'clients' ? 'bg-blue-100 border-l-4 border-blue-600' : ''
+                }`}
+              >
+                👥 Clientes
+              </button>
+            </li>
+            <li>
+              <button
+                onClick={() => setCurrentView('materials')}
+                className={`w-full text-left px-6 py-3 hover:bg-blue-50 transition ${
+                  currentView === 'materials' ? 'bg-blue-100 border-l-4 border-blue-600' : ''
+                }`}
+              >
+                📦 Materiales
+              </button>
+            </li>
           </ul>
         </nav>
 
-        <main className="flex-1 p-4 md:p-6">
+        {/* Main Content */}
+        <main className="flex-1 p-6">
           {currentView === 'dashboard' && <Dashboard token={token} apiUrl={API_URL} />}
           {currentView === 'work-orders' && <WorkOrders token={token} apiUrl={API_URL} />}
           {currentView === 'schedule' && <Schedule token={token} apiUrl={API_URL} />}
