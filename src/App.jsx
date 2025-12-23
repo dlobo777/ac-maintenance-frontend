@@ -50,20 +50,22 @@ function App() {
     return <Login onLogin={handleLogin} apiUrl={API_URL} backendStatus={backendStatus} />;
   }
 
-  const menuItems = [
-    { view: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { view: 'work-orders', label: 'Órdenes', icon: '📋' },
-    { view: 'schedule', label: 'Agenda', icon: '📅' },
-    { view: 'technicians', label: 'Técnicos', icon: '👷' },
-    { view: 'clients', label: 'Clientes', icon: '👥' },
-    { view: 'materials', label: 'Materiales', icon: '📦' },
-    { view: 'users', label: 'Usuarios', icon: '👤' },
-    { view: 'backup', label: 'Respaldo', icon: '💾' }
+  // Menu items basado en rol
+  const allMenuItems = [
+    { view: 'dashboard', label: 'Dashboard', icon: '📊', roles: ['admin', 'tecnico'] },
+    { view: 'work-orders', label: 'Órdenes', icon: '📋', roles: ['admin', 'tecnico'] },
+    { view: 'schedule', label: 'Agenda', icon: '📅', roles: ['admin', 'tecnico'] },
+    { view: 'technicians', label: 'Técnicos', icon: '👷', roles: ['admin'] },
+    { view: 'clients', label: 'Clientes', icon: '👥', roles: ['admin', 'tecnico'] },
+    { view: 'materials', label: 'Materiales', icon: '📦', roles: ['admin', 'tecnico'] },
+    { view: 'users', label: 'Usuarios', icon: '👤', roles: ['admin'] },
+    { view: 'backup', label: 'Respaldo', icon: '💾', roles: ['admin'] }
   ];
+
+  const menuItems = allMenuItems.filter(item => item.roles.includes(user?.role));
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-gradient-to-r from-red-600 to-red-700 text-white shadow-xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex justify-between items-center">
@@ -88,7 +90,6 @@ function App() {
       </header>
 
       <div className="flex">
-        {/* Sidebar Desktop */}
         <aside className="hidden md:block w-64 bg-white shadow-lg min-h-screen">
           <nav className="py-4">
             {menuItems.map(item => (
@@ -108,9 +109,8 @@ function App() {
           </nav>
         </aside>
 
-        {/* Mobile Menu */}
         <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white shadow-2xl border-t z-40">
-          <div className="grid grid-cols-6 gap-1 py-2">
+          <div className="grid gap-1 py-2" style={{gridTemplateColumns: `repeat(${menuItems.length}, 1fr)`}}>
             {menuItems.map(item => (
               <button
                 key={item.view}
@@ -126,16 +126,15 @@ function App() {
           </div>
         </div>
 
-        {/* Main Content */}
         <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6 max-w-7xl">
-          {currentView === 'dashboard' && <Dashboard token={token} apiUrl={API_URL} />}
+          {currentView === 'dashboard' && <Dashboard token={token} apiUrl={API_URL} setCurrentView={setCurrentView} />}
           {currentView === 'work-orders' && <WorkOrders token={token} apiUrl={API_URL} />}
-          {currentView === 'schedule' && <Schedule token={token} apiUrl={API_URL} />}
-          {currentView === 'technicians' && <Technicians token={token} apiUrl={API_URL} />}
+          {currentView === 'schedule' && <Schedule token={token} apiUrl={API_URL} setCurrentView={setCurrentView} />}
+          {currentView === 'technicians' && user?.role === 'admin' && <Technicians token={token} apiUrl={API_URL} />}
           {currentView === 'clients' && <Clients token={token} apiUrl={API_URL} />}
           {currentView === 'materials' && <Materials token={token} apiUrl={API_URL} />}
-          {currentView === 'users' && <Users token={token} apiUrl={API_URL} />}
-          {currentView === 'backup' && <Backup token={token} apiUrl={API_URL} />}
+          {currentView === 'users' && user?.role === 'admin' && <Users token={token} apiUrl={API_URL} />}
+          {currentView === 'backup' && user?.role === 'admin' && <Backup token={token} apiUrl={API_URL} />}
         </main>
       </div>
     </div>

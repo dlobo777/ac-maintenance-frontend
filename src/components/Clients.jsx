@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 export default function Clients({ token, apiUrl }) {
   const [clients, setClients] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -29,8 +30,12 @@ export default function Clients({ token, apiUrl }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch(`${apiUrl}/api/clients`, {
-        method: 'POST',
+      const url = editingId 
+        ? `${apiUrl}/api/clients/${editingId}`
+        : `${apiUrl}/api/clients`;
+      
+      const res = await fetch(url, {
+        method: editingId ? 'PUT' : 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -40,12 +45,42 @@ export default function Clients({ token, apiUrl }) {
 
       if (res.ok) {
         fetchClients();
-        setFormData({ name: '', phone: '', email: '', address: '' });
-        setShowForm(false);
+        resetForm();
       }
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const handleEdit = (client) => {
+    setFormData({
+      name: client.name,
+      phone: client.phone || '',
+      email: client.email || '',
+      address: client.address || ''
+    });
+    setEditingId(client.id);
+    setShowForm(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('¿Eliminar este cliente?')) return;
+    
+    try {
+      await fetch(`${apiUrl}/api/clients/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      fetchClients();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({ name: '', phone: '', email: '', address: '' });
+    setEditingId(null);
+    setShowForm(false);
   };
 
   return (
@@ -62,7 +97,9 @@ export default function Clients({ token, apiUrl }) {
 
       {showForm && (
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h3 className="text-xl font-bold mb-4">Nuevo Cliente</h3>
+          <h3 className="text-xl font-bold mb-4">
+            {editingId ? 'Editar Cliente' : 'Nuevo Cliente'}
+          </h3>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">Nombre *</label>
@@ -101,12 +138,19 @@ export default function Clients({ token, apiUrl }) {
                 className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <div className="md:col-span-2">
+            <div className="md:col-span-2 flex gap-2">
               <button
                 type="submit"
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition"
               >
-                Crear Cliente
+                {editingId ? 'Actualizar' : 'Crear Cliente'}
+              </button>
+              <button
+                type="button"
+                onClick={resetForm}
+                className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition"
+              >
+                Cancelar
               </button>
             </div>
           </form>
@@ -123,12 +167,13 @@ export default function Clients({ token, apiUrl }) {
                 <th className="text-left py-3 px-4">Teléfono</th>
                 <th className="text-left py-3 px-4">Email</th>
                 <th className="text-left py-3 px-4">Dirección</th>
+                <th className="text-left py-3 px-4">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {clients.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="text-center py-4 text-gray-500">No hay clientes</td>
+                  <td colSpan="6" className="text-center py-4 text-gray-500">No hay clientes</td>
                 </tr>
               ) : (
                 clients.map(client => (
@@ -138,6 +183,20 @@ export default function Clients({ token, apiUrl }) {
                     <td className="py-3 px-4">{client.phone || 'N/A'}</td>
                     <td className="py-3 px-4">{client.email || 'N/A'}</td>
                     <td className="py-3 px-4">{client.address || 'N/A'}</td>
+                    <td className="py-3 px-4">
+                      <button
+                        onClick={() => handleEdit(client)}
+                        className="text-blue-600 hover:text-blue-800 mr-3"
+                      >
+                        ✏️ Editar
+                      </button>
+                      <button
+                        onClick={() => handleDelete(client.id)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        🗑️ Eliminar
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}

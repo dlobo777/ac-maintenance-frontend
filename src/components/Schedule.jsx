@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-export default function Schedule({ token, apiUrl }) {
+export default function Schedule({ token, apiUrl, setCurrentView }) {
   const [orders, setOrders] = useState([]);
   const [filter, setFilter] = useState('all');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -35,30 +35,35 @@ export default function Schedule({ token, apiUrl }) {
     return days;
   };
 
- const getOrdersForDate = (date) => {
-  const dateStr = date.toISOString().split('T')[0];
-  return orders.filter(order => {
-    if (!order.scheduled_date) return false;
-    // Maneja tanto formato SQLite como PostgreSQL
-    const orderDate = order.scheduled_date.split('T')[0];
-    return orderDate === dateStr;
-  });
-};
-const translateStatus = (status) => {
-  const translations = {
-    'pending': 'Pendiente',
-    'in_progress': 'En Progreso',
-    'completed': 'Completada',
-    'cancelled': 'Cancelada'
+  const getOrdersForDate = (date) => {
+    const dateStr = date.toISOString().split('T')[0];
+    return orders.filter(order => {
+      if (!order.scheduled_date) return false;
+      const orderDate = order.scheduled_date.split('T')[0];
+      return orderDate === dateStr;
+    });
   };
-  return translations[status] || status;
-};
+
+  const handleOrderClick = (orderId) => {
+    localStorage.setItem('editOrderId', orderId);
+    setCurrentView('work-orders');
+  };
+
+  const translateStatus = (status) => {
+    const translations = {
+      'pending': 'Pendiente',
+      'in_progress': 'En Progreso',
+      'completed': 'Completada',
+      'cancelled': 'Cancelada'
+    };
+    return translations[status] || status;
+  };
 
   const filteredOrders = filter === 'all' 
     ? orders 
     : orders.filter(o => o.status === filter);
 
-  const todayOrders = orders.filter(o => o.scheduled_date === selectedDate);
+  const todayOrders = getOrdersForDate(new Date(selectedDate));
   const weekDays = getWeekDays();
 
   const statusColor = (status) => {
@@ -113,8 +118,9 @@ const translateStatus = (status) => {
                     {dayOrders.slice(0, 3).map(order => (
                       <div
                         key={order.id}
-                        className={`text-xs p-2 rounded ${statusColor(order.status)} text-white`}
-                        title={order.title}
+                        onClick={() => handleOrderClick(order.id)}
+                        className={`text-xs p-2 rounded ${statusColor(order.status)} text-white cursor-pointer hover:opacity-80`}
+                        title={`${order.title} - Click para editar`}
                       >
                         <div className="truncate font-medium">{order.title}</div>
                         <div className="text-xs opacity-90">{order.scheduled_time || 'Sin hora'}</div>
@@ -133,16 +139,22 @@ const translateStatus = (status) => {
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-xl font-bold mb-4">Hoy - {selectedDate}</h3>
+          <h3 className="text-xl font-bold mb-4">
+            {selectedDate === new Date().toISOString().split('T')[0] 
+              ? `Hoy - ${selectedDate}` 
+              : `Día seleccionado - ${selectedDate}`
+            }
+          </h3>
           
           {todayOrders.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No hay órdenes para hoy</p>
+            <p className="text-gray-500 text-center py-8">No hay órdenes para este día</p>
           ) : (
             <div className="space-y-3">
               {todayOrders.map(order => (
                 <div
                   key={order.id}
-                  className="border rounded-lg p-3 hover:shadow-md transition"
+                  onClick={() => handleOrderClick(order.id)}
+                  className="border rounded-lg p-3 hover:shadow-md transition cursor-pointer"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -155,7 +167,7 @@ const translateStatus = (status) => {
                       </div>
                     </div>
                     <span className={`px-2 py-1 rounded text-xs text-white ${statusColor(order.status)}`}>
-                      {order.status}
+                      {translateStatus(order.status)}
                     </span>
                   </div>
                 </div>
@@ -199,15 +211,19 @@ const translateStatus = (status) => {
                 </tr>
               ) : (
                 filteredOrders.map(order => (
-                  <tr key={order.id} className="border-b hover:bg-gray-50">
+                  <tr 
+                    key={order.id} 
+                    onClick={() => handleOrderClick(order.id)}
+                    className="border-b hover:bg-gray-50 cursor-pointer"
+                  >
                     <td className="py-3 px-4">#{order.id}</td>
                     <td className="py-3 px-4 font-medium">{order.title}</td>
                     <td className="py-3 px-4">{order.technician_name || 'Sin asignar'}</td>
-                    <td className="py-3 px-4">{order.scheduled_date || 'N/A'}</td>
+                    <td className="py-3 px-4">{order.scheduled_date?.split('T')[0] || 'N/A'}</td>
                     <td className="py-3 px-4">{order.scheduled_time || 'N/A'}</td>
                     <td className="py-3 px-4">
                       <span className={`px-3 py-1 rounded-full text-sm text-white ${statusColor(order.status)}`}>
-                        {order.status}
+                        {translateStatus(order.status)}
                       </span>
                     </td>
                   </tr>

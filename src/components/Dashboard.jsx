@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 
-export default function Dashboard({ token, apiUrl }) {
+export default function Dashboard({ token, apiUrl, setCurrentView }) {
   const [stats, setStats] = useState({ technicians: 0, workOrders: 0, materials: 0, clients: 0 });
   const [orders, setOrders] = useState([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -74,28 +75,34 @@ export default function Dashboard({ token, apiUrl }) {
     return days;
   };
 
- const getOrdersForDate = (date) => {
-  const dateStr = date.toISOString().split('T')[0];
-  return orders.filter(order => {
-    if (!order.scheduled_date) return false;
-    // Maneja tanto formato SQLite como PostgreSQL
-    const orderDate = order.scheduled_date.split('T')[0];
-    return orderDate === dateStr;
-  });
-};
+  const getOrdersForDate = (date) => {
+    const dateStr = date.toISOString().split('T')[0];
+    return orders.filter(order => {
+      if (!order.scheduled_date) return false;
+      const orderDate = order.scheduled_date.split('T')[0];
+      return orderDate === dateStr;
+    });
+  };
+
+  const handleOrderClick = (orderId) => {
+    setSelectedOrderId(orderId);
+    localStorage.setItem('editOrderId', orderId);
+    setCurrentView('work-orders');
+  };
 
   const changeMonth = (direction) => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + direction, 1));
   };
+
   const translateStatus = (status) => {
-  const translations = {
-    'pending': 'Pendiente',
-    'in_progress': 'En Progreso',
-    'completed': 'Completada',
-    'cancelled': 'Cancelada'
+    const translations = {
+      'pending': 'Pendiente',
+      'in_progress': 'En Progreso',
+      'completed': 'Completada',
+      'cancelled': 'Cancelada'
+    };
+    return translations[status] || status;
   };
-  return translations[status] || status;
-};
 
   const days = getDaysInMonth(currentMonth);
   const today = new Date().toISOString().split('T')[0];
@@ -214,8 +221,9 @@ export default function Dashboard({ token, apiUrl }) {
                     return (
                       <div
                         key={order.id}
-                        className={`${color} text-white text-[10px] px-1 py-0.5 rounded truncate`}
-                        title={order.title}
+                        onClick={() => handleOrderClick(order.id)}
+                        className={`${color} text-white text-[10px] px-1 py-0.5 rounded truncate cursor-pointer hover:opacity-80`}
+                        title={`${order.title} - Click para editar`}
                       >
                         {order.scheduled_time?.substring(0,5)} {order.title.substring(0,10)}
                       </div>
