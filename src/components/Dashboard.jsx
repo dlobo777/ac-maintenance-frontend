@@ -74,14 +74,28 @@ export default function Dashboard({ token, apiUrl }) {
     return days;
   };
 
-  const getOrdersForDate = (date) => {
-    const dateStr = date.toISOString().split('T')[0];
-    return orders.filter(order => order.scheduled_date === dateStr);
-  };
+ const getOrdersForDate = (date) => {
+  const dateStr = date.toISOString().split('T')[0];
+  return orders.filter(order => {
+    if (!order.scheduled_date) return false;
+    // Maneja tanto formato SQLite como PostgreSQL
+    const orderDate = order.scheduled_date.split('T')[0];
+    return orderDate === dateStr;
+  });
+};
 
   const changeMonth = (direction) => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + direction, 1));
   };
+  const translateStatus = (status) => {
+  const translations = {
+    'pending': 'Pendiente',
+    'in_progress': 'En Progreso',
+    'completed': 'Completada',
+    'cancelled': 'Cancelada'
+  };
+  return translations[status] || status;
+};
 
   const days = getDaysInMonth(currentMonth);
   const today = new Date().toISOString().split('T')[0];

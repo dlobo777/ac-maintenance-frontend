@@ -138,7 +138,15 @@ export default function WorkOrders({ token, apiUrl }) {
       default: return 'bg-blue-100 text-blue-800';
     }
   };
-
+const translateStatus = (status) => {
+  const translations = {
+    'pending': 'Pendiente',
+    'in_progress': 'En Progreso',
+    'completed': 'Completada',
+    'cancelled': 'Cancelada'
+  };
+  return translations[status] || status;
+};
   return (
     <div>
       <div className="flex justify-between items-center mb-6">

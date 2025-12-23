@@ -103,14 +103,6 @@ export default function Login({ onLogin, apiUrl, backendStatus }) {
           </button>
         </form>
 
-        {/* Credentials */}
-        <div className="mt-6 bg-gray-50 rounded-lg p-4 text-center">
-          <p className="text-xs text-gray-600 mb-2">Credenciales por defecto:</p>
-          <div className="text-sm space-y-1">
-            <p><span className="font-semibold">Usuario:</span> admin</p>
-            <p><span className="font-semibold">Contraseña:</span> admin</p>
-          </div>
-        </div>
       </div>
     </div>
   );

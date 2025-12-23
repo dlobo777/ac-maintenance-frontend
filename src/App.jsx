@@ -6,6 +6,8 @@ import WorkOrders from './components/WorkOrders';
 import Materials from './components/Materials';
 import Clients from './components/Clients';
 import Schedule from './components/Schedule';
+import Users from './components/Users';
+import Backup from './components/Backup';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -54,7 +56,9 @@ function App() {
     { view: 'schedule', label: 'Agenda', icon: '📅' },
     { view: 'technicians', label: 'Técnicos', icon: '👷' },
     { view: 'clients', label: 'Clientes', icon: '👥' },
-    { view: 'materials', label: 'Materiales', icon: '📦' }
+    { view: 'materials', label: 'Materiales', icon: '📦' },
+    { view: 'users', label: 'Usuarios', icon: '👤' },
+    { view: 'backup', label: 'Respaldo', icon: '💾' }
   ];
 
   return (
@@ -130,6 +134,8 @@ function App() {
           {currentView === 'technicians' && <Technicians token={token} apiUrl={API_URL} />}
           {currentView === 'clients' && <Clients token={token} apiUrl={API_URL} />}
           {currentView === 'materials' && <Materials token={token} apiUrl={API_URL} />}
+          {currentView === 'users' && <Users token={token} apiUrl={API_URL} />}
+          {currentView === 'backup' && <Backup token={token} apiUrl={API_URL} />}
         </main>
       </div>
     </div>
