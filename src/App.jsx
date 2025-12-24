@@ -8,6 +8,7 @@ import Clients from './components/Clients';
 import Schedule from './components/Schedule';
 import Users from './components/Users';
 import Backup from './components/Backup';
+import Warehouses from './components/Warehouses';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -51,17 +52,17 @@ function App() {
   }
 
   // Menu items basado en rol
-  const allMenuItems = [
-    { view: 'dashboard', label: 'Dashboard', icon: '📊', roles: ['admin', 'tecnico'] },
-    { view: 'work-orders', label: 'Órdenes', icon: '📋', roles: ['admin', 'tecnico'] },
-    { view: 'schedule', label: 'Agenda', icon: '📅', roles: ['admin', 'tecnico'] },
-    { view: 'technicians', label: 'Técnicos', icon: '👷', roles: ['admin'] },
-    { view: 'clients', label: 'Clientes', icon: '👥', roles: ['admin', 'tecnico'] },
-    { view: 'materials', label: 'Materiales', icon: '📦', roles: ['admin', 'tecnico'] },
-    { view: 'users', label: 'Usuarios', icon: '👤', roles: ['admin'] },
-    { view: 'backup', label: 'Respaldo', icon: '💾', roles: ['admin'] }
-  ];
-
+const allMenuItems = [
+  { view: 'dashboard', label: 'Dashboard', icon: '📊', roles: ['admin', 'tecnico'] },
+  { view: 'work-orders', label: 'Órdenes', icon: '📋', roles: ['admin', 'tecnico'] },
+  { view: 'schedule', label: 'Agenda', icon: '📅', roles: ['admin', 'tecnico'] },
+  { view: 'technicians', label: 'Técnicos', icon: '👷', roles: ['admin'] },
+  { view: 'clients', label: 'Clientes', icon: '👥', roles: ['admin', 'tecnico'] },
+  { view: 'materials', label: 'Materiales', icon: '📦', roles: ['admin', 'tecnico'] },
+  { view: 'warehouses', label: 'Bodegas', icon: '🏪', roles: ['admin', 'tecnico'] },
+  { view: 'users', label: 'Usuarios', icon: '👤', roles: ['admin'] },
+  { view: 'backup', label: 'Respaldo', icon: '💾', roles: ['admin'] }
+];
   const menuItems = allMenuItems.filter(item => item.roles.includes(user?.role));
 
   return (
@@ -133,6 +134,7 @@ function App() {
           {currentView === 'technicians' && user?.role === 'admin' && <Technicians token={token} apiUrl={API_URL} />}
           {currentView === 'clients' && <Clients token={token} apiUrl={API_URL} />}
           {currentView === 'materials' && <Materials token={token} apiUrl={API_URL} />}
+          {currentView === 'warehouses' && <Warehouses token={token} apiUrl={API_URL} />}
           {currentView === 'users' && user?.role === 'admin' && <Users token={token} apiUrl={API_URL} />}
           {currentView === 'backup' && user?.role === 'admin' && <Backup token={token} apiUrl={API_URL} />}
         </main>

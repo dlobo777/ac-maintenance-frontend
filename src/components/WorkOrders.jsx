@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-export default function WorkOrders({ token, apiUrl, editOrderId }) {
+export default function WorkOrders({ token, apiUrl }) {
   const [orders, setOrders] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -8,6 +8,15 @@ export default function WorkOrders({ token, apiUrl, editOrderId }) {
   const [technicians, setTechnicians] = useState([]);
   const [showClientSearch, setShowClientSearch] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
+  
+  // Estados para cerrar orden
+  const [showCloseModal, setShowCloseModal] = useState(false);
+  const [closingOrderId, setClosingOrderId] = useState(null);
+  const [warehouses, setWarehouses] = useState([]);
+  const [selectedWarehouse, setSelectedWarehouse] = useState(null);
+  const [warehouseInventory, setWarehouseInventory] = useState([]);
+  const [usedMaterials, setUsedMaterials] = useState([]);
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -23,16 +32,27 @@ export default function WorkOrders({ token, apiUrl, editOrderId }) {
     fetchOrders();
     fetchClients();
     fetchTechnicians();
+    fetchWarehouses();
   }, []);
 
+  // Efecto para editar orden desde localStorage
   useEffect(() => {
-    if (editOrderId) {
-      const order = orders.find(o => o.id === editOrderId);
+    const editId = localStorage.getItem('editOrderId');
+    if (editId && orders.length > 0) {
+      const order = orders.find(o => o.id === parseInt(editId));
       if (order) {
         handleEdit(order);
+        localStorage.removeItem('editOrderId');
       }
     }
-  }, [editOrderId, orders]);
+  }, [orders]);
+
+  // Efecto para cargar inventario cuando se selecciona bodega
+  useEffect(() => {
+    if (selectedWarehouse) {
+      fetchWarehouseInventory(selectedWarehouse);
+    }
+  }, [selectedWarehouse]);
 
   const fetchOrders = async () => {
     try {
@@ -65,6 +85,30 @@ export default function WorkOrders({ token, apiUrl, editOrderId }) {
       });
       const data = await res.json();
       setTechnicians(data.filter(t => t.status === 'active'));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchWarehouses = async () => {
+    try {
+      const res = await fetch(`${apiUrl}/api/warehouses`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setWarehouses(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchWarehouseInventory = async (warehouseId) => {
+    try {
+      const res = await fetch(`${apiUrl}/api/warehouses/${warehouseId}/inventory`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setWarehouseInventory(data);
     } catch (err) {
       console.error(err);
     }
@@ -121,6 +165,64 @@ export default function WorkOrders({ token, apiUrl, editOrderId }) {
       fetchOrders();
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleCloseOrder = (orderId) => {
+    setClosingOrderId(orderId);
+    setShowCloseModal(true);
+    setUsedMaterials([]);
+    setSelectedWarehouse(null);
+  };
+
+  const addMaterial = () => {
+    setUsedMaterials([...usedMaterials, { material_id: '', quantity: 0 }]);
+  };
+
+  const removeMaterial = (index) => {
+    setUsedMaterials(usedMaterials.filter((_, i) => i !== index));
+  };
+
+  const updateMaterial = (index, field, value) => {
+    const updated = [...usedMaterials];
+    updated[index][field] = value;
+    setUsedMaterials(updated);
+  };
+
+  const submitCloseOrder = async () => {
+    if (!selectedWarehouse) {
+      alert('Selecciona una bodega');
+      return;
+    }
+
+    const materials = usedMaterials.map(m => ({
+      ...m,
+      warehouse_id: selectedWarehouse
+    }));
+
+    try {
+      const res = await fetch(`${apiUrl}/api/work-orders/${closingOrderId}/close`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ materials })
+      });
+
+      if (res.ok) {
+        alert('✅ Orden cerrada exitosamente');
+        fetchOrders();
+        setShowCloseModal(false);
+        setClosingOrderId(null);
+        setUsedMaterials([]);
+        setSelectedWarehouse(null);
+      } else {
+        const error = await res.json();
+        alert('❌ Error: ' + error.error);
+      }
+    } catch (err) {
+      alert('❌ Error: ' + err.message);
     }
   };
 
@@ -387,19 +489,35 @@ export default function WorkOrders({ token, apiUrl, editOrderId }) {
                       </span>
                     </td>
                     <td className="py-3 px-4">{order.scheduled_date?.split('T')[0] || 'N/A'}</td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 flex items-center gap-2">
                       <button
                         onClick={() => handleEdit(order)}
-                        className="text-blue-600 hover:text-blue-800 mr-3"
+                        className="text-blue-600 hover:text-blue-800"
+                        title="Editar"
                       >
                         ✏️
                       </button>
+                      {order.status !== 'completed' && (
+                        <button
+                          onClick={() => handleCloseOrder(order.id)}
+                          className="text-green-600 hover:text-green-800"
+                          title="Cerrar orden"
+                        >
+                          ✅
+                        </button>
+                      )}
                       <button
                         onClick={() => handleDelete(order.id)}
                         className="text-red-600 hover:text-red-800"
+                        title="Eliminar"
                       >
                         🗑️
                       </button>
+                      {order.closed_by && (
+                        <span className="text-xs text-gray-500" title={`Cerrada el ${new Date(order.closed_at).toLocaleString()}`}>
+                          👤 #{order.closed_by}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -408,6 +526,110 @@ export default function WorkOrders({ token, apiUrl, editOrderId }) {
           </table>
         </div>
       </div>
+
+      {/* Close Order Modal */}
+      {showCloseModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold mb-4">Cerrar Orden #{closingOrderId}</h3>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Bodega *</label>
+              <select
+                value={selectedWarehouse || ''}
+                onChange={(e) => setSelectedWarehouse(parseInt(e.target.value))}
+                className="w-full px-4 py-2 border rounded-lg"
+              >
+                <option value="">Seleccionar bodega...</option>
+                {warehouses.map(w => (
+                  <option key={w.id} value={w.id}>{w.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mb-4">
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-sm font-medium">Materiales Utilizados</label>
+                <button
+                  onClick={addMaterial}
+                  className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
+                  disabled={!selectedWarehouse}
+                >
+                  + Agregar
+                </button>
+              </div>
+
+              {usedMaterials.length === 0 ? (
+                <p className="text-gray-500 text-sm">No hay materiales agregados</p>
+              ) : (
+                <div className="space-y-2">
+                  {usedMaterials.map((item, index) => (
+                    <div key={index} className="flex gap-2">
+                      <select
+                        value={item.material_id}
+                        onChange={(e) => updateMaterial(index, 'material_id', parseInt(e.target.value))}
+                        className="flex-1 px-3 py-2 border rounded"
+                      >
+                        <option value="">Seleccionar material...</option>
+                        {warehouseInventory.map(inv => (
+                          <option key={inv.material_id} value={inv.material_id}>
+                            {inv.name} (Disponible: {inv.quantity} {inv.unit})
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        placeholder="Cantidad"
+                        value={item.quantity}
+                        onChange={(e) => updateMaterial(index, 'quantity', parseInt(e.target.value))}
+                        className="w-24 px-3 py-2 border rounded"
+                        min="1"
+                      />
+                      <button
+                        onClick={() => removeMaterial(index)}
+                        className="text-red-600 hover:text-red-800 px-2"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-yellow-50 border border-yellow-200 p-3 rounded mb-4">
+              <p className="text-sm text-yellow-800">
+                ⚠️ Al cerrar esta orden:
+                <ul className="list-disc ml-5 mt-1">
+                  <li>Se descontarán los materiales de la bodega seleccionada</li>
+                  <li>El estado cambiará a "Completada"</li>
+                  <li>Se registrará quién cerró la orden</li>
+                </ul>
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={submitCloseOrder}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition"
+              >
+                Cerrar Orden
+              </button>
+              <button
+                onClick={() => {
+                  setShowCloseModal(false);
+                  setClosingOrderId(null);
+                  setUsedMaterials([]);
+                  setSelectedWarehouse(null);
+                }}
+                className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
