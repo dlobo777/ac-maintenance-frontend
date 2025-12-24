@@ -4,7 +4,6 @@ export default function Materials({ token, apiUrl }) {
   const [materials, setMaterials] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [mainWarehouse, setMainWarehouse] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -15,21 +14,7 @@ export default function Materials({ token, apiUrl }) {
 
   useEffect(() => {
     fetchMaterials();
-    fetchMainWarehouse();
   }, []);
-
-  const fetchMainWarehouse = async () => {
-    try {
-      const res = await fetch(`${apiUrl}/api/warehouses`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      const main = data.find(w => w.is_main);
-      setMainWarehouse(main);
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   const fetchMaterials = async () => {
     try {
@@ -40,36 +25,6 @@ export default function Materials({ token, apiUrl }) {
       setMaterials(data);
     } catch (err) {
       console.error(err);
-    }
-  };
-
-  const updateWarehouseInventory = async (materialId, quantity) => {
-    if (!mainWarehouse) {
-      alert('⚠️ No hay bodega principal configurada');
-      return false;
-    }
-
-    try {
-      // Actualizar el inventario de la bodega principal
-      const res = await fetch(`${apiUrl}/api/warehouses/${mainWarehouse.id}/inventory`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          material_id: materialId,
-          quantity: quantity
-        })
-      });
-
-      if (!res.ok) {
-        throw new Error('Error al actualizar inventario de bodega');
-      }
-      return true;
-    } catch (err) {
-      console.error('Error actualizando bodega:', err);
-      return false;
     }
   };
 
@@ -90,28 +45,11 @@ export default function Materials({ token, apiUrl }) {
       });
 
       if (res.ok) {
-        const savedMaterial = await res.json();
-        
-        // Si es un material nuevo o si se actualizó el stock, actualizar la bodega principal
-        if (formData.stock > 0) {
-          const inventoryUpdated = await updateWarehouseInventory(
-            savedMaterial.id || editingId, 
-            formData.stock
-          );
-          
-          if (inventoryUpdated) {
-            alert('✅ Material guardado y asignado a bodega principal');
-          } else {
-            alert('⚠️ Material guardado pero hubo un problema al asignar a bodega principal');
-          }
-        }
-        
         fetchMaterials();
         resetForm();
       }
     } catch (err) {
       console.error(err);
-      alert('❌ Error al guardar el material');
     }
   };
 
@@ -144,19 +82,7 @@ export default function Materials({ token, apiUrl }) {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-3xl font-bold text-gray-800">Materiales</h2>
-          {mainWarehouse && (
-            <p className="text-sm text-gray-600 mt-1">
-              📦 Bodega principal: <span className="font-semibold">{mainWarehouse.name}</span>
-            </p>
-          )}
-          {!mainWarehouse && (
-            <p className="text-sm text-red-600 mt-1">
-              ⚠️ No hay bodega principal configurada
-            </p>
-          )}
-        </div>
+        <h2 className="text-3xl font-bold text-gray-800">Materiales</h2>
         <button
           onClick={() => setShowForm(!showForm)}
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition"
@@ -193,13 +119,11 @@ export default function Materials({ token, apiUrl }) {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">
-                Stock Inicial * {mainWarehouse && <span className="text-xs text-gray-500">(se asignará a {mainWarehouse.name})</span>}
-              </label>
+              <label className="block text-sm font-medium mb-2">Stock Actual *</label>
               <input
                 type="number"
                 value={formData.stock}
-                onChange={(e) => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })}
+                onChange={(e) => setFormData({ ...formData, stock: parseInt(e.target.value) })}
                 className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                 required
               />
@@ -209,7 +133,7 @@ export default function Materials({ token, apiUrl }) {
               <input
                 type="number"
                 value={formData.min_stock}
-                onChange={(e) => setFormData({ ...formData, min_stock: parseInt(e.target.value) || 0 })}
+                onChange={(e) => setFormData({ ...formData, min_stock: parseInt(e.target.value) })}
                 className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                 required
               />
@@ -227,7 +151,6 @@ export default function Materials({ token, apiUrl }) {
               <button
                 type="submit"
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition"
-                disabled={!mainWarehouse}
               >
                 {editingId ? 'Actualizar' : 'Crear'}
               </button>
@@ -239,13 +162,6 @@ export default function Materials({ token, apiUrl }) {
                 Cancelar
               </button>
             </div>
-            {!mainWarehouse && (
-              <div className="md:col-span-2 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                <p className="text-sm text-yellow-800">
-                  ⚠️ Debes crear una bodega principal primero en la sección de Bodegas
-                </p>
-              </div>
-            )}
           </form>
         </div>
       )}
