@@ -21,7 +21,7 @@ export default function Backup({ token, apiUrl }) {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `backup-artico-${new Date().toISOString().split('T')[0]}-${Date.now()}.json`;
+      a.download = `backup-artico-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -45,16 +45,11 @@ export default function Backup({ token, apiUrl }) {
     }
 
     setLoading(true);
-    setMessage('Restaurando... Por favor espera...');
+    setMessage('');
 
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-
-      // Validate backup structure
-      if (!data.data || !data.timestamp) {
-        throw new Error('Archivo de respaldo inválido');
-      }
 
       const response = await fetch(`${apiUrl}/api/backup/restore`, {
         method: 'POST',
@@ -66,11 +61,10 @@ export default function Backup({ token, apiUrl }) {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Error al restaurar el respaldo');
+        throw new Error('Error al restaurar el respaldo');
       }
 
-      setMessage('✅ Respaldo restaurado exitosamente. Recargando página...');
+      setMessage('✅ Respaldo restaurado exitosamente. Recarga la página.');
       setTimeout(() => window.location.reload(), 2000);
     } catch (err) {
       setMessage('❌ Error: ' + err.message);
@@ -98,22 +92,19 @@ export default function Backup({ token, apiUrl }) {
           <button
             onClick={handleDownloadBackup}
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition disabled:opacity-50"
           >
-            {loading ? '⏳ Generando...' : '📥 Descargar Respaldo'}
+            {loading ? 'Generando...' : 'Descargar Respaldo'}
           </button>
 
           <div className="mt-4 p-4 bg-blue-50 rounded-lg">
             <p className="text-sm text-blue-800">
               <strong>📋 Incluye:</strong>
-              <ul className="mt-2 ml-4 list-disc text-xs space-y-1">
+              <ul className="mt-2 ml-4 list-disc text-xs">
                 <li>Técnicos</li>
                 <li>Clientes</li>
                 <li>Órdenes de trabajo</li>
-                <li>Materiales usados en órdenes</li>
                 <li>Materiales</li>
-                <li>Bodegas</li>
-                <li>Inventario de bodegas</li>
                 <li>Usuarios (sin contraseñas)</li>
               </ul>
             </p>
@@ -137,19 +128,18 @@ export default function Backup({ token, apiUrl }) {
               accept=".json"
               onChange={handleRestoreBackup}
               disabled={loading}
-              className="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-red-600 file:text-white hover:file:bg-red-700 file:cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-red-600 file:text-white hover:file:bg-red-700 file:cursor-pointer disabled:opacity-50"
             />
           </label>
 
           <div className="mt-4 p-4 bg-red-50 rounded-lg border border-red-200">
             <p className="text-sm text-red-800">
               <strong>⚠️ ADVERTENCIA:</strong>
-              <ul className="mt-2 ml-4 list-disc text-xs space-y-1">
+              <ul className="mt-2 ml-4 list-disc text-xs">
                 <li>Esto eliminará todos los datos actuales</li>
                 <li>Los reemplazará con el respaldo</li>
                 <li>Esta acción no se puede deshacer</li>
                 <li>Asegúrate de tener un respaldo reciente</li>
-                <li>Los usuarios NO se restauran (se mantienen)</li>
               </ul>
             </p>
           </div>
@@ -161,8 +151,6 @@ export default function Backup({ token, apiUrl }) {
         <div className={`mt-6 p-4 rounded-lg ${
           message.includes('✅') 
             ? 'bg-green-50 border border-green-200 text-green-800' 
-            : message.includes('⏳') || message.includes('Restaurando')
-            ? 'bg-yellow-50 border border-yellow-200 text-yellow-800'
             : 'bg-red-50 border border-red-200 text-red-800'
         }`}>
           <p className="text-center font-medium">{message}</p>
@@ -177,33 +165,19 @@ export default function Backup({ token, apiUrl }) {
           <ol className="ml-4 list-decimal space-y-1">
             <li>Click en "Descargar Respaldo"</li>
             <li>El archivo se descargará automáticamente</li>
-            <li>Guárdalo en un lugar seguro (Google Drive, USB, etc.)</li>
-            <li>El nombre incluye fecha y hora para fácil identificación</li>
+            <li>Guárdalo en un lugar seguro</li>
           </ol>
 
           <p className="mt-4"><strong>Para restaurar:</strong></p>
           <ol className="ml-4 list-decimal space-y-1">
             <li>Click en "Seleccionar archivo"</li>
             <li>Selecciona el archivo de respaldo (.json)</li>
-            <li>Confirma la acción (lee la advertencia)</li>
+            <li>Confirma la acción</li>
             <li>Espera a que se complete la restauración</li>
-            <li>La página se recargará automáticamente</li>
           </ol>
 
-          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
-            <p className="text-xs text-yellow-800">
-              <strong>⚠️ Importante:</strong> Los usuarios y contraseñas NO se restauran del respaldo por seguridad. 
-              Esto significa que después de restaurar, podrás seguir usando tu usuario actual para iniciar sesión.
-            </p>
-          </div>
-
           <p className="mt-4 text-xs text-gray-600">
-            <strong>💡 Consejo:</strong> Haz respaldos regularmente:
-            <ul className="ml-4 list-disc mt-1">
-              <li>Antes de hacer cambios importantes</li>
-              <li>Al final de cada día/semana</li>
-              <li>Después de ingresar muchos datos nuevos</li>
-            </ul>
+            <strong>💡 Consejo:</strong> Haz respaldos regularmente, especialmente antes de hacer cambios importantes.
           </p>
         </div>
       </div>
