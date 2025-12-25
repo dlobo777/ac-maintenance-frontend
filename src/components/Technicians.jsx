@@ -45,11 +45,16 @@ export default function Technicians({ token, apiUrl }) {
       });
 
       if (res.ok) {
+        alert('✅ Técnico guardado exitosamente');
         fetchTechnicians();
         resetForm();
+      } else {
+        const error = await res.json();
+        alert('❌ Error: ' + (error.error || 'No se pudo guardar el técnico'));
       }
     } catch (err) {
       console.error(err);
+      alert('❌ Error al guardar: ' + err.message);
     }
   };
 
@@ -60,16 +65,35 @@ export default function Technicians({ token, apiUrl }) {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('¿Eliminar este técnico?')) return;
+    // Verificar si tiene órdenes o bodegas asignadas
+    const tech = technicians.find(t => t.id === id);
+    
+    if (!confirm(`¿Eliminar el técnico "${tech.name}"?\n\nNOTA: Si tiene órdenes de trabajo o bodegas asignadas, no podrá eliminarse. En ese caso, puedes marcarlo como "Inactivo".`)) {
+      return;
+    }
     
     try {
-      await fetch(`${apiUrl}/api/technicians/${id}`, {
+      const res = await fetch(`${apiUrl}/api/technicians/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      fetchTechnicians();
+
+      if (res.ok) {
+        alert('✅ Técnico eliminado exitosamente');
+        fetchTechnicians();
+      } else {
+        const error = await res.json();
+        
+        // Mensaje más específico según el error
+        if (error.error?.includes('foreign key') || error.error?.includes('constraint')) {
+          alert(`❌ No se puede eliminar este técnico porque tiene:\n\n- Órdenes de trabajo asignadas, O\n- Una bodega asignada\n\nSolución: Marca el técnico como "Inactivo" en lugar de eliminarlo.`);
+        } else {
+          alert('❌ Error: ' + (error.error || 'No se pudo eliminar el técnico'));
+        }
+      }
     } catch (err) {
       console.error(err);
+      alert('❌ Error de conexión: ' + err.message);
     }
   };
 
@@ -89,6 +113,14 @@ export default function Technicians({ token, apiUrl }) {
         >
           {showForm ? 'Cancelar' : '+ Nuevo Técnico'}
         </button>
+      </div>
+
+      {/* Info box */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <p className="text-sm text-blue-800">
+          💡 <strong>Consejo:</strong> Si un técnico ya no trabaja contigo pero tiene órdenes históricas o bodegas asignadas, 
+          márcalo como <strong>"Inactivo"</strong> en lugar de eliminarlo. Así mantienes el historial completo.
+        </p>
       </div>
 
       {showForm && (
@@ -114,6 +146,7 @@ export default function Technicians({ token, apiUrl }) {
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="+506-8888-1234"
               />
             </div>
             <div>
@@ -123,6 +156,7 @@ export default function Technicians({ token, apiUrl }) {
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="tecnico@email.com"
               />
             </div>
             <div>
