@@ -310,20 +310,23 @@ export default function Schedule({ token, apiUrl, setCurrentView }) {
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-gray-800 text-sm truncate">{order.title}</div>
                       <div className="text-xs text-gray-600 mt-1 truncate">
-                        {order.technician_name || 'Sin asignar'}
+                        👤 {order.client_name || 'Sin cliente'}
+                      </div>
+                      <div className="text-xs text-gray-600 mt-1 truncate">
+                        👨‍🔧 {order.technician_name || 'Sin asignar'}
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
                         🕐 {order.scheduled_time || 'Sin hora'}
                       </div>
                     </div>
-                    <div className="flex flex-col gap-1 items-end flex-shrink-0">
+                    <div className="flex flex-col gap-2 items-end flex-shrink-0">
                       <span className={`px-2 py-1 rounded text-xs text-white whitespace-nowrap ${statusColor(order.status)}`}>
                         {translateStatus(order.status)}
                       </span>
-                      <div className="flex gap-1">
+                      <div className="flex gap-2">
                         <button
                           onClick={() => handleOrderClick(order.id)}
-                          className="text-blue-600 hover:text-blue-800 text-xs"
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition text-sm font-medium"
                           title="Editar"
                         >
                           ✏️
@@ -331,7 +334,7 @@ export default function Schedule({ token, apiUrl, setCurrentView }) {
                         {order.status !== 'completed' && (
                           <button
                             onClick={() => handleCloseOrder(order.id)}
-                            className="text-green-600 hover:text-green-800 text-xs"
+                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg transition text-sm font-medium"
                             title="Cerrar orden"
                           >
                             ✅
@@ -410,11 +413,12 @@ export default function Schedule({ token, apiUrl, setCurrentView }) {
 
         {/* Tabla responsive */}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[600px]">
+          <table className="w-full min-w-[700px]">
             <thead className="bg-gray-50">
               <tr>
                 <th className="text-left py-3 px-2 md:px-4 text-xs md:text-sm">ID</th>
                 <th className="text-left py-3 px-2 md:px-4 text-xs md:text-sm">Título</th>
+                <th className="text-left py-3 px-2 md:px-4 text-xs md:text-sm">Cliente</th>
                 <th className="text-left py-3 px-2 md:px-4 text-xs md:text-sm">Técnico</th>
                 <th className="text-left py-3 px-2 md:px-4 text-xs md:text-sm">Fecha</th>
                 <th className="text-left py-3 px-2 md:px-4 text-xs md:text-sm">Hora</th>
@@ -425,7 +429,7 @@ export default function Schedule({ token, apiUrl, setCurrentView }) {
             <tbody>
               {filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="text-center py-8 text-gray-500 text-sm">
+                  <td colSpan="8" className="text-center py-8 text-gray-500 text-sm">
                     No hay órdenes que coincidan con los filtros
                   </td>
                 </tr>
@@ -434,6 +438,7 @@ export default function Schedule({ token, apiUrl, setCurrentView }) {
                   <tr key={order.id} className="border-b hover:bg-gray-50">
                     <td className="py-3 px-2 md:px-4 text-xs md:text-sm">#{order.id}</td>
                     <td className="py-3 px-2 md:px-4 font-medium text-xs md:text-sm">{order.title}</td>
+                    <td className="py-3 px-2 md:px-4 text-xs md:text-sm">{order.client_name || 'Sin cliente'}</td>
                     <td className="py-3 px-2 md:px-4 text-xs md:text-sm">{order.technician_name || 'Sin asignar'}</td>
                     <td className="py-3 px-2 md:px-4 text-xs md:text-sm">
                       {normalizeDateString(order.scheduled_date) || 'N/A'}
@@ -448,7 +453,7 @@ export default function Schedule({ token, apiUrl, setCurrentView }) {
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleOrderClick(order.id)}
-                          className="text-blue-600 hover:text-blue-800"
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition text-xs md:text-sm font-medium"
                           title="Editar"
                         >
                           ✏️
@@ -456,7 +461,7 @@ export default function Schedule({ token, apiUrl, setCurrentView }) {
                         {order.status !== 'completed' && (
                           <button
                             onClick={() => handleCloseOrder(order.id)}
-                            className="text-green-600 hover:text-green-800"
+                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg transition text-xs md:text-sm font-medium"
                             title="Cerrar orden"
                           >
                             ✅
