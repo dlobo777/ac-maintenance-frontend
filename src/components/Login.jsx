@@ -38,6 +38,10 @@ export default function Login({ onLogin, apiUrl, backendStatus }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center p-4">
+       <div className="absolute left-4 bottom-4 text-white">
+        <p className="text-lg font-semibold tracking-wide">Dlobosoft</p>
+        <p className="text-xs opacity-75">v1.0.0</p>
+      </div>
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-6">
