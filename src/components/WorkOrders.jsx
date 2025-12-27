@@ -190,9 +190,9 @@ export default function WorkOrders({ token, apiUrl }) {
   };
 
   const submitCloseOrder = async () => {
-    if (!selectedWarehouse) {
-      alert('Selecciona una bodega');
-      return;
+   // if (!selectedWarehouse) {
+     // alert('Selecciona una bodega');
+     // return;
     }
 
     const materials = usedMaterials.map(m => ({
