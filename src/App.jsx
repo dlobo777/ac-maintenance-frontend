@@ -32,6 +32,47 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Protección contra cierre accidental o navegación hacia atrás
+  useEffect(() => {
+    // Solo activar si el usuario está logueado
+    if (!token) return;
+
+    // Advertencia al cerrar pestaña/navegador o recargar página
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = ''; // Chrome requiere esto
+      return ''; // Para compatibilidad con navegadores antiguos
+    };
+
+    // Advertencia al usar botón "atrás" del navegador
+    const handlePopState = (e) => {
+      const confirmLeave = window.confirm(
+        '⚠️ ¿Deseas salir de la aplicación?\n\nTodos los datos no guardados se perderán.\n\nPresiona "Cancelar" para quedarte o "Aceptar" para salir.'
+      );
+      
+      if (!confirmLeave) {
+        // Si cancela, volver a poner la página en el estado actual
+        window.history.pushState(null, '', window.location.href);
+      } else {
+        // Si confirma, hacer logout y permitir navegación
+        handleLogout();
+      }
+    };
+
+    // Agregar entrada inicial al historial para capturar el botón "atrás"
+    window.history.pushState(null, '', window.location.href);
+
+    // Agregar listeners
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('popstate', handlePopState);
+
+    // Cleanup al desmontar
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [token]); // Se ejecuta cuando cambia el token (login/logout)
+
   const handleLogin = (token, user) => {
     setToken(token);
     setUser(user);
@@ -52,17 +93,17 @@ function App() {
   }
 
   // Menu items basado en rol
-const allMenuItems = [
-  { view: 'dashboard', label: 'Dashboard', icon: '📊', roles: ['admin', 'tecnico'] },
-  { view: 'work-orders', label: 'Órdenes', icon: '📋', roles: ['admin', 'tecnico'] },
-  { view: 'schedule', label: 'Agenda', icon: '📅', roles: ['admin', 'tecnico'] },
-  { view: 'technicians', label: 'Técnicos', icon: '👷', roles: ['admin'] },
-  { view: 'clients', label: 'Clientes', icon: '👥', roles: ['admin', 'tecnico'] },
-  { view: 'materials', label: 'Materiales', icon: '📦', roles: ['admin', 'tecnico'] },
-  { view: 'warehouses', label: 'Bodegas', icon: '🏪', roles: ['admin', 'tecnico'] },
-  { view: 'users', label: 'Usuarios', icon: '👤', roles: ['admin'] },
-  { view: 'backup', label: 'Respaldo', icon: '💾', roles: ['admin'] }
-];
+  const allMenuItems = [
+    { view: 'dashboard', label: 'Dashboard', icon: '📊', roles: ['admin', 'tecnico'] },
+    { view: 'work-orders', label: 'Órdenes', icon: '📋', roles: ['admin', 'tecnico'] },
+    { view: 'schedule', label: 'Agenda', icon: '📅', roles: ['admin', 'tecnico'] },
+    { view: 'technicians', label: 'Técnicos', icon: '👷', roles: ['admin'] },
+    { view: 'clients', label: 'Clientes', icon: '👥', roles: ['admin', 'tecnico'] },
+    { view: 'materials', label: 'Materiales', icon: '📦', roles: ['admin', 'tecnico'] },
+    { view: 'warehouses', label: 'Bodegas', icon: '🏪', roles: ['admin', 'tecnico'] },
+    { view: 'users', label: 'Usuarios', icon: '👤', roles: ['admin'] },
+    { view: 'backup', label: 'Respaldo', icon: '💾', roles: ['admin'] }
+  ];
   const menuItems = allMenuItems.filter(item => item.roles.includes(user?.role));
 
   return (
