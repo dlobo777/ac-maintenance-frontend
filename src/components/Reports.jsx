@@ -3,22 +3,41 @@ import React, { useState, useEffect } from 'react';
 export default function Reports({ token, apiUrl }) {
   const [orders, setOrders] = useState([]);
   const [technicians, setTechnicians] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [materials, setMaterials] = useState([]);
+  const [orderMaterials, setOrderMaterials] = useState([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [reportData, setReportData] = useState([]);
+  const [clientActivityData, setClientActivityData] = useState([]);
+  const [materialUsageData, setMaterialUsageData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedReport, setSelectedReport] = useState('orders-by-technician');
+  
+  // Filtros para uso de materiales
+  const [materialsYear, setMaterialsYear] = useState(new Date().getFullYear());
+  const [materialsMonth, setMaterialsMonth] = useState('all');
+  const [materialsTechnician, setMaterialsTechnician] = useState('all');
 
   useEffect(() => {
     fetchOrders();
     fetchTechnicians();
+    fetchClients();
+    fetchMaterials();
+    fetchOrderMaterials();
   }, []);
 
   useEffect(() => {
     if (orders.length > 0 && technicians.length > 0) {
       generateReport();
     }
-  }, [selectedYear, selectedMonth, orders, technicians]);
+    if (orders.length > 0 && clients.length > 0) {
+      generateClientActivityReport();
+    }
+    if (orders.length > 0 && materials.length > 0 && orderMaterials.length > 0 && technicians.length > 0) {
+      generateMaterialUsageReport();
+    }
+  }, [selectedYear, selectedMonth, orders, technicians, clients, materials, orderMaterials, materialsYear, materialsMonth, materialsTechnician]);
 
   const fetchOrders = async () => {
     try {
@@ -39,6 +58,54 @@ export default function Reports({ token, apiUrl }) {
       });
       const data = await res.json();
       setTechnicians(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchClients = async () => {
+    try {
+      const res = await fetch(`${apiUrl}/api/clients`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setClients(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchMaterials = async () => {
+    try {
+      const res = await fetch(`${apiUrl}/api/materials`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setMaterials(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchOrderMaterials = async () => {
+    try {
+      // Obtener todos los materiales usados en órdenes
+      const allOrderMaterials = [];
+      for (const order of orders) {
+        const res = await fetch(`${apiUrl}/api/work-orders/${order.id}/materials`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        data.forEach(mat => {
+          allOrderMaterials.push({
+            ...mat,
+            order_id: order.id,
+            technician_id: order.technician_id,
+            scheduled_date: order.scheduled_date
+          });
+        });
+      }
+      setOrderMaterials(allOrderMaterials);
     } catch (err) {
       console.error(err);
     }
@@ -96,6 +163,132 @@ export default function Reports({ token, apiUrl }) {
 
     setReportData([...report, totals]);
     setLoading(false);
+  };
+
+  const generateClientActivityReport = () => {
+    const today = new Date();
+    
+    const report = clients.map(client => {
+      // Obtener todas las órdenes completadas del cliente
+      const clientOrders = orders.filter(order => 
+        order.client_id === client.id && 
+        order.status === 'completed' &&
+        order.scheduled_date
+      );
+
+      if (clientOrders.length === 0) {
+        return {
+          client_id: client.id,
+          client_name: client.name,
+          phone: client.phone || 'N/A',
+          last_order_date: null,
+          projected_date: null,
+          days_remaining: null,
+          percentage: null,
+          status: 'sin-ordenes'
+        };
+      }
+
+      // Encontrar la fecha de la última orden
+      const lastOrder = clientOrders.reduce((latest, order) => {
+        const orderDate = new Date(order.scheduled_date);
+        return orderDate > new Date(latest.scheduled_date) ? order : latest;
+      });
+
+      const lastOrderDate = new Date(lastOrder.scheduled_date);
+      
+      // Calcular fecha proyectada (4 meses después)
+      const projectedDate = new Date(lastOrderDate);
+      projectedDate.setMonth(projectedDate.getMonth() + 4);
+
+      // Calcular días totales y días restantes
+      const totalDays = Math.floor((projectedDate - lastOrderDate) / (1000 * 60 * 60 * 24));
+      const daysElapsed = Math.floor((today - lastOrderDate) / (1000 * 60 * 60 * 24));
+      const daysRemaining = Math.floor((projectedDate - today) / (1000 * 60 * 60 * 24));
+      
+      // Calcular porcentaje transcurrido
+      const percentage = Math.min(100, Math.max(0, (daysElapsed / totalDays) * 100));
+
+      // Determinar estado del semáforo
+      let status = 'verde'; // < 30%
+      if (percentage >= 90) status = 'rojo';
+      else if (percentage >= 60) status = 'amarillo';
+
+      return {
+        client_id: client.id,
+        client_name: client.name,
+        phone: client.phone || 'N/A',
+        last_order_date: lastOrderDate,
+        projected_date: projectedDate,
+        days_remaining: daysRemaining,
+        percentage: percentage,
+        status: status
+      };
+    });
+
+    // Ordenar por porcentaje (los más urgentes primero)
+    report.sort((a, b) => {
+      if (a.status === 'sin-ordenes') return 1;
+      if (b.status === 'sin-ordenes') return -1;
+      return (b.percentage || 0) - (a.percentage || 0);
+    });
+
+    setClientActivityData(report);
+  };
+
+  const generateMaterialUsageReport = () => {
+    // Filtrar materiales de órdenes según los filtros
+    let filteredMaterials = orderMaterials.filter(om => {
+      if (!om.scheduled_date) return false;
+      
+      const orderDate = new Date(om.scheduled_date);
+      const orderYear = orderDate.getFullYear();
+      const orderMonth = orderDate.getMonth() + 1;
+
+      // Filtro de año (obligatorio)
+      if (orderYear !== materialsYear) return false;
+
+      // Filtro de mes (opcional)
+      if (materialsMonth !== 'all' && orderMonth !== parseInt(materialsMonth)) return false;
+
+      // Filtro de técnico (opcional)
+      if (materialsTechnician !== 'all' && om.technician_id !== parseInt(materialsTechnician)) return false;
+
+      return true;
+    });
+
+    // Agrupar por material
+    const materialGroups = {};
+    filteredMaterials.forEach(om => {
+      if (!materialGroups[om.material_id]) {
+        const material = materials.find(m => m.id === om.material_id);
+        materialGroups[om.material_id] = {
+          material_id: om.material_id,
+          material_name: material?.name || 'Desconocido',
+          unit: material?.unit || '',
+          total_quantity: 0,
+          by_technician: {}
+        };
+      }
+      
+      materialGroups[om.material_id].total_quantity += om.quantity;
+
+      // Agrupar por técnico
+      const techId = om.technician_id || 'sin-asignar';
+      if (!materialGroups[om.material_id].by_technician[techId]) {
+        const tech = technicians.find(t => t.id === om.technician_id);
+        materialGroups[om.material_id].by_technician[techId] = {
+          technician_name: tech?.name || 'Sin asignar',
+          quantity: 0
+        };
+      }
+      materialGroups[om.material_id].by_technician[techId].quantity += om.quantity;
+    });
+
+    // Convertir a array y ordenar por cantidad total
+    const report = Object.values(materialGroups).sort((a, b) => b.total_quantity - a.total_quantity);
+
+    setMaterialUsageData(report);
   };
 
   const exportToExcel = () => {
@@ -199,15 +392,13 @@ export default function Reports({ token, apiUrl }) {
       id: 'materials-usage',
       name: 'Uso de Materiales',
       icon: '📦',
-      description: 'Próximamente',
-      disabled: true
+      description: 'Materiales utilizados por técnico y período'
     },
     {
       id: 'client-activity',
       name: 'Actividad de Clientes',
       icon: '👥',
-      description: 'Próximamente',
-      disabled: true
+      description: 'Seguimiento de mantenimientos por cliente'
     },
     {
       id: 'performance',
@@ -436,6 +627,390 @@ export default function Reports({ token, apiUrl }) {
                   para el período seleccionado. Las órdenes se contabilizan según su fecha programada.
                 </p>
               </div>
+            </div>
+          )}
+
+          {selectedReport === 'materials-usage' && (
+            <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <h3 className="text-lg md:text-xl font-bold text-gray-800">
+                  📦 Uso de Materiales
+                </h3>
+                <button
+                  onClick={() => {
+                    const monthName = materialsMonth === 'all' 
+                      ? 'Todos' 
+                      : months.find(m => m.value === parseInt(materialsMonth))?.label;
+                    const techName = materialsTechnician === 'all'
+                      ? 'Todos'
+                      : technicians.find(t => t.id === parseInt(materialsTechnician))?.name;
+
+                    const html = `
+                      <html>
+                        <head><meta charset="UTF-8"><title>Uso de Materiales</title></head>
+                        <body>
+                          <h2>Reporte de Uso de Materiales</h2>
+                          <p><strong>Año:</strong> ${materialsYear}</p>
+                          <p><strong>Mes:</strong> ${monthName}</p>
+                          <p><strong>Técnico:</strong> ${techName}</p>
+                          <br>
+                          <table border="1" style="border-collapse: collapse; width: 100%;">
+                            <tr>
+                              <th>Material</th>
+                              <th>Cantidad Total</th>
+                              <th>Unidad</th>
+                              <th>Detalle por Técnico</th>
+                            </tr>
+                            ${materialUsageData.map(row => `
+                              <tr>
+                                <td>${row.material_name}</td>
+                                <td>${row.total_quantity}</td>
+                                <td>${row.unit}</td>
+                                <td>${Object.values(row.by_technician).map(t => `${t.technician_name}: ${t.quantity}`).join(', ')}</td>
+                              </tr>
+                            `).join('')}
+                          </table>
+                          <p>Generado: ${new Date().toLocaleString('es-ES')}</p>
+                        </body>
+                      </html>
+                    `;
+                    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Uso_Materiales_${materialsYear}_${monthName}.xls`;
+                    a.click();
+                  }}
+                  disabled={materialUsageData.length === 0}
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  📥 Exportar a Excel
+                </button>
+              </div>
+
+              {/* Filtros */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Año *</label>
+                  <select
+                    value={materialsYear}
+                    onChange={(e) => setMaterialsYear(parseInt(e.target.value))}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    {years.map(year => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Mes (opcional)</label>
+                  <select
+                    value={materialsMonth}
+                    onChange={(e) => setMaterialsMonth(e.target.value)}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">Todos los meses</option>
+                    {months.map(month => (
+                      <option key={month.value} value={month.value}>
+                        {month.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Técnico (opcional)</label>
+                  <select
+                    value={materialsTechnician}
+                    onChange={(e) => setMaterialsTechnician(e.target.value)}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">Todos los técnicos</option>
+                    {technicians.map(tech => (
+                      <option key={tech.id} value={tech.id}>
+                        {tech.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Resumen de filtros activos */}
+              <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm text-blue-800">
+                  <strong>📊 Mostrando:</strong> {' '}
+                  {materialsMonth === 'all' ? 'Todos los meses de ' : months.find(m => m.value === parseInt(materialsMonth))?.label + ' '}
+                  {materialsYear}
+                  {materialsTechnician !== 'all' && ` • Técnico: ${technicians.find(t => t.id === parseInt(materialsTechnician))?.name}`}
+                  {materialsTechnician === 'all' && ' • Todos los técnicos'}
+                </p>
+              </div>
+
+              {materialUsageData.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No hay datos de uso de materiales para los filtros seleccionados
+                </div>
+              ) : (
+                <>
+                  {/* Resumen general */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <div className="text-2xl font-bold text-blue-700">
+                        {materialUsageData.length}
+                      </div>
+                      <div className="text-sm text-blue-600">Materiales diferentes</div>
+                    </div>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="text-2xl font-bold text-green-700">
+                        {materialUsageData.reduce((sum, m) => sum + m.total_quantity, 0)}
+                      </div>
+                      <div className="text-sm text-green-600">Unidades totales</div>
+                    </div>
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                      <div className="text-2xl font-bold text-purple-700">
+                        {new Set(orderMaterials.filter(om => {
+                          const orderDate = new Date(om.scheduled_date);
+                          return orderDate.getFullYear() === materialsYear &&
+                                 (materialsMonth === 'all' || orderDate.getMonth() + 1 === parseInt(materialsMonth)) &&
+                                 (materialsTechnician === 'all' || om.technician_id === parseInt(materialsTechnician));
+                        }).map(om => om.order_id)).size}
+                      </div>
+                      <div className="text-sm text-purple-600">Órdenes con materiales</div>
+                    </div>
+                  </div>
+
+                  {/* Tabla */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[600px]">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="text-left py-3 px-4 font-semibold text-gray-700">Material</th>
+                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Cantidad Total</th>
+                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Unidad</th>
+                          <th className="text-left py-3 px-4 font-semibold text-gray-700">Detalle por Técnico</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {materialUsageData.map((row, index) => (
+                          <tr key={index} className="border-b hover:bg-gray-50">
+                            <td className="py-3 px-4 font-medium">{row.material_name}</td>
+                            <td className="py-3 px-4 text-center">
+                              <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-semibold">
+                                {row.total_quantity}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-center text-gray-600">{row.unit}</td>
+                            <td className="py-3 px-4">
+                              <div className="space-y-1">
+                                {Object.entries(row.by_technician).map(([techId, data]) => (
+                                  <div key={techId} className="flex justify-between items-center text-sm bg-gray-50 px-3 py-1 rounded">
+                                    <span className="text-gray-700">{data.technician_name}</span>
+                                    <span className="font-semibold text-blue-700">{data.quantity} {row.unit}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Nota informativa */}
+                  <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <p className="text-sm text-gray-700">
+                      <strong>📌 Nota:</strong> Este reporte muestra los materiales utilizados en órdenes completadas durante el período seleccionado. 
+                      Los materiales se agrupan por tipo y se desglosan por técnico que los utilizó.
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {selectedReport === 'client-activity' && (
+            <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <h3 className="text-lg md:text-xl font-bold text-gray-800">
+                  👥 Actividad de Clientes
+                </h3>
+                <button
+                  onClick={() => {
+                    // Exportar reporte de clientes
+                    const html = `
+                      <html>
+                        <head><meta charset="UTF-8"><title>Actividad de Clientes</title></head>
+                        <body>
+                          <h2>Reporte de Actividad de Clientes</h2>
+                          <table border="1" style="border-collapse: collapse; width: 100%;">
+                            <tr>
+                              <th>Cliente</th>
+                              <th>Teléfono</th>
+                              <th>Última Orden</th>
+                              <th>Fecha Proyectada</th>
+                              <th>Días Restantes</th>
+                              <th>Porcentaje</th>
+                              <th>Estado</th>
+                            </tr>
+                            ${clientActivityData.map(row => `
+                              <tr>
+                                <td>${row.client_name}</td>
+                                <td>${row.phone}</td>
+                                <td>${row.last_order_date ? row.last_order_date.toLocaleDateString('es-ES') : 'N/A'}</td>
+                                <td>${row.projected_date ? row.projected_date.toLocaleDateString('es-ES') : 'N/A'}</td>
+                                <td>${row.days_remaining !== null ? row.days_remaining : 'N/A'}</td>
+                                <td>${row.percentage !== null ? row.percentage.toFixed(1) + '%' : 'N/A'}</td>
+                                <td>${row.status === 'verde' ? '🟢' : row.status === 'amarillo' ? '🟡' : row.status === 'rojo' ? '🔴' : 'Sin órdenes'}</td>
+                              </tr>
+                            `).join('')}
+                          </table>
+                          <p>Generado: ${new Date().toLocaleString('es-ES')}</p>
+                        </body>
+                      </html>
+                    `;
+                    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Actividad_Clientes_${new Date().toISOString().split('T')[0]}.xls`;
+                    a.click();
+                  }}
+                  disabled={clientActivityData.length === 0}
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  📥 Exportar a Excel
+                </button>
+              </div>
+
+              {clientActivityData.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No hay datos de clientes
+                </div>
+              ) : (
+                <>
+                  {/* Resumen */}
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <div className="text-2xl font-bold text-red-700">
+                        {clientActivityData.filter(c => c.status === 'rojo').length}
+                      </div>
+                      <div className="text-sm text-red-600">🔴 Urgentes (≥90%)</div>
+                    </div>
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <div className="text-2xl font-bold text-yellow-700">
+                        {clientActivityData.filter(c => c.status === 'amarillo').length}
+                      </div>
+                      <div className="text-sm text-yellow-600">🟡 Próximos (≥60%)</div>
+                    </div>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="text-2xl font-bold text-green-700">
+                        {clientActivityData.filter(c => c.status === 'verde').length}
+                      </div>
+                      <div className="text-sm text-green-600">🟢 Al día (<60%)</div>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <div className="text-2xl font-bold text-gray-700">
+                        {clientActivityData.filter(c => c.status === 'sin-ordenes').length}
+                      </div>
+                      <div className="text-sm text-gray-600">⚪ Sin órdenes</div>
+                    </div>
+                  </div>
+
+                  {/* Tabla */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[800px]">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="text-left py-3 px-4 font-semibold text-gray-700">Cliente</th>
+                          <th className="text-left py-3 px-4 font-semibold text-gray-700">Teléfono</th>
+                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Última Orden</th>
+                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Fecha Proyectada</th>
+                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Días Restantes</th>
+                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Progreso</th>
+                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {clientActivityData.map((row, index) => {
+                          const statusBg = row.status === 'rojo' ? 'bg-red-50' :
+                                          row.status === 'amarillo' ? 'bg-yellow-50' :
+                                          row.status === 'verde' ? 'bg-green-50' : 'bg-gray-50';
+                          
+                          return (
+                            <tr key={index} className={`border-b hover:bg-gray-50 ${statusBg}`}>
+                              <td className="py-3 px-4 font-medium">{row.client_name}</td>
+                              <td className="py-3 px-4">{row.phone}</td>
+                              <td className="py-3 px-4 text-center">
+                                {row.last_order_date 
+                                  ? row.last_order_date.toLocaleDateString('es-ES')
+                                  : 'N/A'
+                                }
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                {row.projected_date 
+                                  ? row.projected_date.toLocaleDateString('es-ES')
+                                  : 'N/A'
+                                }
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                {row.days_remaining !== null ? (
+                                  <span className={`font-semibold ${
+                                    row.days_remaining < 0 ? 'text-red-700' : 'text-gray-700'
+                                  }`}>
+                                    {row.days_remaining < 0 ? 'Vencido' : `${row.days_remaining} días`}
+                                  </span>
+                                ) : 'N/A'}
+                              </td>
+                              <td className="py-3 px-4">
+                                {row.percentage !== null ? (
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex-1 bg-gray-200 rounded-full h-4 overflow-hidden">
+                                      <div 
+                                        className={`h-full ${
+                                          row.status === 'rojo' ? 'bg-red-500' :
+                                          row.status === 'amarillo' ? 'bg-yellow-500' : 'bg-green-500'
+                                        }`}
+                                        style={{ width: `${Math.min(100, row.percentage)}%` }}
+                                      ></div>
+                                    </div>
+                                    <span className="text-xs font-semibold w-12 text-right">
+                                      {row.percentage.toFixed(0)}%
+                                    </span>
+                                  </div>
+                                ) : 'N/A'}
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                {row.status === 'rojo' && <span className="text-2xl">🔴</span>}
+                                {row.status === 'amarillo' && <span className="text-2xl">🟡</span>}
+                                {row.status === 'verde' && <span className="text-2xl">🟢</span>}
+                                {row.status === 'sin-ordenes' && <span className="text-gray-400">⚪</span>}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Leyenda */}
+                  <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <p className="text-sm text-gray-700 mb-2">
+                      <strong>📌 Nota:</strong> Este reporte muestra el seguimiento de mantenimientos por cliente:
+                    </p>
+                    <ul className="text-sm text-gray-700 list-disc ml-5 space-y-1">
+                      <li><strong>Última Orden:</strong> Fecha del último mantenimiento completado</li>
+                      <li><strong>Fecha Proyectada:</strong> 4 meses después del último mantenimiento</li>
+                      <li><strong>Días Restantes:</strong> Días hasta la fecha proyectada</li>
+                      <li><strong>🟢 Verde:</strong> Menos del 30% del tiempo transcurrido (cliente al día)</li>
+                      <li><strong>🟡 Amarillo:</strong> Entre 60% y 89% del tiempo transcurrido (próximo a vencer)</li>
+                      <li><strong>🔴 Rojo:</strong> 90% o más del tiempo transcurrido (urgente, contactar pronto)</li>
+                    </ul>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

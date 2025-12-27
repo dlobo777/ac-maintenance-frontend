@@ -190,15 +190,28 @@ export default function WorkOrders({ token, apiUrl }) {
   };
 
   const submitCloseOrder = async () => {
-   // if (!selectedWarehouse) {
-     // alert('Selecciona una bodega');
-     // return;
+    // Validar solo si hay materiales agregados
+    if (usedMaterials.length > 0 && !selectedWarehouse) {
+      alert('⚠️ Si vas a registrar materiales, debes seleccionar una bodega');
+      return;
     }
 
-    const materials = usedMaterials.map(m => ({
-      ...m,
-      warehouse_id: selectedWarehouse
-    }));
+    // Validar que los materiales tengan datos completos
+    if (usedMaterials.length > 0) {
+      const invalidMaterials = usedMaterials.some(m => !m.material_id || !m.quantity || m.quantity <= 0);
+      if (invalidMaterials) {
+        alert('⚠️ Por favor completa todos los materiales (material y cantidad)');
+        return;
+      }
+    }
+
+    // Solo enviar materiales si hay una bodega seleccionada y materiales agregados
+    const materials = (selectedWarehouse && usedMaterials.length > 0) 
+      ? usedMaterials.map(m => ({
+          ...m,
+          warehouse_id: selectedWarehouse
+        }))
+      : [];
 
     try {
       const res = await fetch(`${apiUrl}/api/work-orders/${closingOrderId}/close`, {
@@ -211,7 +224,10 @@ export default function WorkOrders({ token, apiUrl }) {
       });
 
       if (res.ok) {
-        alert('✅ Orden cerrada exitosamente');
+        const message = materials.length > 0 
+          ? '✅ Orden cerrada exitosamente con materiales registrados'
+          : '✅ Orden cerrada exitosamente (sin materiales)';
+        alert(message);
         fetchOrders();
         setShowCloseModal(false);
         setClosingOrderId(null);
@@ -534,7 +550,7 @@ export default function WorkOrders({ token, apiUrl }) {
             <h3 className="text-xl font-bold mb-4">Cerrar Orden #{closingOrderId}</h3>
             
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">Bodega *</label>
+              <label className="block text-sm font-medium mb-2">Bodega (opcional)</label>
               <select
                 value={selectedWarehouse || ''}
                 onChange={(e) => setSelectedWarehouse(parseInt(e.target.value))}
@@ -545,19 +561,28 @@ export default function WorkOrders({ token, apiUrl }) {
                   <option key={w.id} value={w.id}>{w.name}</option>
                 ))}
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Solo necesario si vas a registrar materiales
+              </p>
             </div>
 
             <div className="mb-4">
               <div className="flex justify-between items-center mb-2">
-                <label className="text-sm font-medium">Materiales Utilizados</label>
+                <label className="text-sm font-medium">Materiales Utilizados (opcional)</label>
                 <button
                   onClick={addMaterial}
-                  className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
+                  className="bg-blue-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
                   disabled={!selectedWarehouse}
                 >
                   + Agregar
                 </button>
               </div>
+
+              {!selectedWarehouse && (
+                <p className="text-xs text-gray-500 mb-2">
+                  Selecciona una bodega para poder agregar materiales
+                </p>
+              )}
 
               {usedMaterials.length === 0 ? (
                 <p className="text-gray-500 text-sm">No hay materiales agregados</p>
@@ -597,13 +622,18 @@ export default function WorkOrders({ token, apiUrl }) {
               )}
             </div>
 
-            <div className="bg-yellow-50 border border-yellow-200 p-3 rounded mb-4">
-              <p className="text-sm text-yellow-800">
-                ⚠️ Al cerrar esta orden:
+            <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4">
+              <p className="text-sm text-blue-800">
+                ℹ️ Al cerrar esta orden:
                 <ul className="list-disc ml-5 mt-1">
-                  <li>Se descontarán los materiales de la bodega seleccionada</li>
                   <li>El estado cambiará a "Completada"</li>
                   <li>Se registrará quién cerró la orden</li>
+                  {usedMaterials.length > 0 && (
+                    <li className="font-semibold">Se descontarán los materiales de la bodega seleccionada</li>
+                  )}
+                  {usedMaterials.length === 0 && (
+                    <li>No se registrarán materiales (cierre sin materiales)</li>
+                  )}
                 </ul>
               </p>
             </div>
