@@ -4,27 +4,17 @@ export default function Reports({ token, apiUrl }) {
   const [orders, setOrders] = useState([]);
   const [technicians, setTechnicians] = useState([]);
   const [clients, setClients] = useState([]);
-  const [materials, setMaterials] = useState([]);
-  const [orderMaterials, setOrderMaterials] = useState([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [reportData, setReportData] = useState([]);
   const [clientActivityData, setClientActivityData] = useState([]);
-  const [materialUsageData, setMaterialUsageData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedReport, setSelectedReport] = useState('orders-by-technician');
-  
-  // Filtros para uso de materiales
-  const [materialsYear, setMaterialsYear] = useState(new Date().getFullYear());
-  const [materialsMonth, setMaterialsMonth] = useState('all');
-  const [materialsTechnician, setMaterialsTechnician] = useState('all');
 
   useEffect(() => {
     fetchOrders();
     fetchTechnicians();
     fetchClients();
-    fetchMaterials();
-    fetchOrderMaterials();
   }, []);
 
   useEffect(() => {
@@ -34,10 +24,7 @@ export default function Reports({ token, apiUrl }) {
     if (orders.length > 0 && clients.length > 0) {
       generateClientActivityReport();
     }
-    if (orders.length > 0 && materials.length > 0 && orderMaterials.length > 0 && technicians.length > 0) {
-      generateMaterialUsageReport();
-    }
-  }, [selectedYear, selectedMonth, orders, technicians, clients, materials, orderMaterials, materialsYear, materialsMonth, materialsTechnician]);
+  }, [selectedYear, selectedMonth, orders, technicians, clients]);
 
   const fetchOrders = async () => {
     try {
@@ -70,42 +57,6 @@ export default function Reports({ token, apiUrl }) {
       });
       const data = await res.json();
       setClients(data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const fetchMaterials = async () => {
-    try {
-      const res = await fetch(`${apiUrl}/api/materials`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      setMaterials(data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const fetchOrderMaterials = async () => {
-    try {
-      // Obtener todos los materiales usados en órdenes
-      const allOrderMaterials = [];
-      for (const order of orders) {
-        const res = await fetch(`${apiUrl}/api/work-orders/${order.id}/materials`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const data = await res.json();
-        data.forEach(mat => {
-          allOrderMaterials.push({
-            ...mat,
-            order_id: order.id,
-            technician_id: order.technician_id,
-            scheduled_date: order.scheduled_date
-          });
-        });
-      }
-      setOrderMaterials(allOrderMaterials);
     } catch (err) {
       console.error(err);
     }
@@ -236,61 +187,6 @@ export default function Reports({ token, apiUrl }) {
     setClientActivityData(report);
   };
 
-  const generateMaterialUsageReport = () => {
-    // Filtrar materiales de órdenes según los filtros
-    let filteredMaterials = orderMaterials.filter(om => {
-      if (!om.scheduled_date) return false;
-      
-      const orderDate = new Date(om.scheduled_date);
-      const orderYear = orderDate.getFullYear();
-      const orderMonth = orderDate.getMonth() + 1;
-
-      // Filtro de año (obligatorio)
-      if (orderYear !== materialsYear) return false;
-
-      // Filtro de mes (opcional)
-      if (materialsMonth !== 'all' && orderMonth !== parseInt(materialsMonth)) return false;
-
-      // Filtro de técnico (opcional)
-      if (materialsTechnician !== 'all' && om.technician_id !== parseInt(materialsTechnician)) return false;
-
-      return true;
-    });
-
-    // Agrupar por material
-    const materialGroups = {};
-    filteredMaterials.forEach(om => {
-      if (!materialGroups[om.material_id]) {
-        const material = materials.find(m => m.id === om.material_id);
-        materialGroups[om.material_id] = {
-          material_id: om.material_id,
-          material_name: material?.name || 'Desconocido',
-          unit: material?.unit || '',
-          total_quantity: 0,
-          by_technician: {}
-        };
-      }
-      
-      materialGroups[om.material_id].total_quantity += om.quantity;
-
-      // Agrupar por técnico
-      const techId = om.technician_id || 'sin-asignar';
-      if (!materialGroups[om.material_id].by_technician[techId]) {
-        const tech = technicians.find(t => t.id === om.technician_id);
-        materialGroups[om.material_id].by_technician[techId] = {
-          technician_name: tech?.name || 'Sin asignar',
-          quantity: 0
-        };
-      }
-      materialGroups[om.material_id].by_technician[techId].quantity += om.quantity;
-    });
-
-    // Convertir a array y ordenar por cantidad total
-    const report = Object.values(materialGroups).sort((a, b) => b.total_quantity - a.total_quantity);
-
-    setMaterialUsageData(report);
-  };
-
   const exportToExcel = () => {
     const monthName = new Date(selectedYear, selectedMonth - 1).toLocaleString('es-ES', { month: 'long' });
     
@@ -392,7 +288,8 @@ export default function Reports({ token, apiUrl }) {
       id: 'materials-usage',
       name: 'Uso de Materiales',
       icon: '📦',
-      description: 'Materiales utilizados por técnico y período'
+      description: 'Próximamente',
+      disabled: true
     },
     {
       id: 'client-activity',
