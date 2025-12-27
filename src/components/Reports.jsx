@@ -3,28 +3,22 @@ import React, { useState, useEffect } from 'react';
 export default function Reports({ token, apiUrl }) {
   const [orders, setOrders] = useState([]);
   const [technicians, setTechnicians] = useState([]);
-  const [clients, setClients] = useState([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [reportData, setReportData] = useState([]);
-  const [clientActivityData, setClientActivityData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedReport, setSelectedReport] = useState('orders-by-technician');
 
   useEffect(() => {
     fetchOrders();
     fetchTechnicians();
-    fetchClients();
   }, []);
 
   useEffect(() => {
     if (orders.length > 0 && technicians.length > 0) {
       generateReport();
     }
-    if (orders.length > 0 && clients.length > 0) {
-      generateClientActivityReport();
-    }
-  }, [selectedYear, selectedMonth, orders, technicians, clients]);
+  }, [selectedYear, selectedMonth, orders, technicians]);
 
   const fetchOrders = async () => {
     try {
@@ -45,18 +39,6 @@ export default function Reports({ token, apiUrl }) {
       });
       const data = await res.json();
       setTechnicians(data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const fetchClients = async () => {
-    try {
-      const res = await fetch(`${apiUrl}/api/clients`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      setClients(data);
     } catch (err) {
       console.error(err);
     }
@@ -114,77 +96,6 @@ export default function Reports({ token, apiUrl }) {
 
     setReportData([...report, totals]);
     setLoading(false);
-  };
-
-  const generateClientActivityReport = () => {
-    const today = new Date();
-    
-    const report = clients.map(client => {
-      // Obtener todas las órdenes completadas del cliente
-      const clientOrders = orders.filter(order => 
-        order.client_id === client.id && 
-        order.status === 'completed' &&
-        order.scheduled_date
-      );
-
-      if (clientOrders.length === 0) {
-        return {
-          client_id: client.id,
-          client_name: client.name,
-          phone: client.phone || 'N/A',
-          last_order_date: null,
-          projected_date: null,
-          days_remaining: null,
-          percentage: null,
-          status: 'sin-ordenes'
-        };
-      }
-
-      // Encontrar la fecha de la última orden
-      const lastOrder = clientOrders.reduce((latest, order) => {
-        const orderDate = new Date(order.scheduled_date);
-        return orderDate > new Date(latest.scheduled_date) ? order : latest;
-      });
-
-      const lastOrderDate = new Date(lastOrder.scheduled_date);
-      
-      // Calcular fecha proyectada (4 meses después)
-      const projectedDate = new Date(lastOrderDate);
-      projectedDate.setMonth(projectedDate.getMonth() + 4);
-
-      // Calcular días totales y días restantes
-      const totalDays = Math.floor((projectedDate - lastOrderDate) / (1000 * 60 * 60 * 24));
-      const daysElapsed = Math.floor((today - lastOrderDate) / (1000 * 60 * 60 * 24));
-      const daysRemaining = Math.floor((projectedDate - today) / (1000 * 60 * 60 * 24));
-      
-      // Calcular porcentaje transcurrido
-      const percentage = Math.min(100, Math.max(0, (daysElapsed / totalDays) * 100));
-
-      // Determinar estado del semáforo
-      let status = 'verde'; // < 30%
-      if (percentage >= 90) status = 'rojo';
-      else if (percentage >= 60) status = 'amarillo';
-
-      return {
-        client_id: client.id,
-        client_name: client.name,
-        phone: client.phone || 'N/A',
-        last_order_date: lastOrderDate,
-        projected_date: projectedDate,
-        days_remaining: daysRemaining,
-        percentage: percentage,
-        status: status
-      };
-    });
-
-    // Ordenar por porcentaje (los más urgentes primero)
-    report.sort((a, b) => {
-      if (a.status === 'sin-ordenes') return 1;
-      if (b.status === 'sin-ordenes') return -1;
-      return (b.percentage || 0) - (a.percentage || 0);
-    });
-
-    setClientActivityData(report);
   };
 
   const exportToExcel = () => {
@@ -295,7 +206,8 @@ export default function Reports({ token, apiUrl }) {
       id: 'client-activity',
       name: 'Actividad de Clientes',
       icon: '👥',
-      description: 'Seguimiento de mantenimientos por cliente'
+      description: 'Próximamente',
+      disabled: true
     },
     {
       id: 'performance',
@@ -524,189 +436,6 @@ export default function Reports({ token, apiUrl }) {
                   para el período seleccionado. Las órdenes se contabilizan según su fecha programada.
                 </p>
               </div>
-            </div>
-          )}
-
-          {selectedReport === 'client-activity' && (
-            <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                <h3 className="text-lg md:text-xl font-bold text-gray-800">
-                  👥 Actividad de Clientes
-                </h3>
-                <button
-                  onClick={() => {
-                    // Exportar reporte de clientes
-                    const html = `
-                      <html>
-                        <head><meta charset="UTF-8"><title>Actividad de Clientes</title></head>
-                        <body>
-                          <h2>Reporte de Actividad de Clientes</h2>
-                          <table border="1" style="border-collapse: collapse; width: 100%;">
-                            <tr>
-                              <th>Cliente</th>
-                              <th>Teléfono</th>
-                              <th>Última Orden</th>
-                              <th>Fecha Proyectada</th>
-                              <th>Días Restantes</th>
-                              <th>Porcentaje</th>
-                              <th>Estado</th>
-                            </tr>
-                            ${clientActivityData.map(row => `
-                              <tr>
-                                <td>${row.client_name}</td>
-                                <td>${row.phone}</td>
-                                <td>${row.last_order_date ? row.last_order_date.toLocaleDateString('es-ES') : 'N/A'}</td>
-                                <td>${row.projected_date ? row.projected_date.toLocaleDateString('es-ES') : 'N/A'}</td>
-                                <td>${row.days_remaining !== null ? row.days_remaining : 'N/A'}</td>
-                                <td>${row.percentage !== null ? row.percentage.toFixed(1) + '%' : 'N/A'}</td>
-                                <td>${row.status === 'verde' ? '🟢' : row.status === 'amarillo' ? '🟡' : row.status === 'rojo' ? '🔴' : 'Sin órdenes'}</td>
-                              </tr>
-                            `).join('')}
-                          </table>
-                          <p>Generado: ${new Date().toLocaleString('es-ES')}</p>
-                        </body>
-                      </html>
-                    `;
-                    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `Actividad_Clientes_${new Date().toISOString().split('T')[0]}.xls`;
-                    a.click();
-                  }}
-                  disabled={clientActivityData.length === 0}
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  📥 Exportar a Excel
-                </button>
-              </div>
-
-              {clientActivityData.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No hay datos de clientes
-                </div>
-              ) : (
-                <>
-                  {/* Resumen */}
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                      <div className="text-2xl font-bold text-red-700">
-                        {clientActivityData.filter(c => c.status === 'rojo').length}
-                      </div>
-                      <div className="text-sm text-red-600">🔴 Urgentes (≥90%)</div>
-                    </div>
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                      <div className="text-2xl font-bold text-yellow-700">
-                        {clientActivityData.filter(c => c.status === 'amarillo').length}
-                      </div>
-                      <div className="text-sm text-yellow-600">🟡 Próximos (≥60%)</div>
-                    </div>
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                      <div className="text-2xl font-bold text-green-700">
-                        {clientActivityData.filter(c => c.status === 'verde').length}
-                      </div>
-                      <div className="text-sm text-green-600">🟢 Al día (<60%)</div>
-                    </div>
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                      <div className="text-2xl font-bold text-gray-700">
-                        {clientActivityData.filter(c => c.status === 'sin-ordenes').length}
-                      </div>
-                      <div className="text-sm text-gray-600">⚪ Sin órdenes</div>
-                    </div>
-                  </div>
-
-                  {/* Tabla */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[800px]">
-                      <thead>
-                        <tr className="bg-gray-50">
-                          <th className="text-left py-3 px-4 font-semibold text-gray-700">Cliente</th>
-                          <th className="text-left py-3 px-4 font-semibold text-gray-700">Teléfono</th>
-                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Última Orden</th>
-                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Fecha Proyectada</th>
-                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Días Restantes</th>
-                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Progreso</th>
-                          <th className="text-center py-3 px-4 font-semibold text-gray-700">Estado</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {clientActivityData.map((row, index) => {
-                          const statusBg = row.status === 'rojo' ? 'bg-red-50' :
-                                          row.status === 'amarillo' ? 'bg-yellow-50' :
-                                          row.status === 'verde' ? 'bg-green-50' : 'bg-gray-50';
-                          
-                          return (
-                            <tr key={index} className={`border-b hover:bg-gray-50 ${statusBg}`}>
-                              <td className="py-3 px-4 font-medium">{row.client_name}</td>
-                              <td className="py-3 px-4">{row.phone}</td>
-                              <td className="py-3 px-4 text-center">
-                                {row.last_order_date 
-                                  ? row.last_order_date.toLocaleDateString('es-ES')
-                                  : 'N/A'
-                                }
-                              </td>
-                              <td className="py-3 px-4 text-center">
-                                {row.projected_date 
-                                  ? row.projected_date.toLocaleDateString('es-ES')
-                                  : 'N/A'
-                                }
-                              </td>
-                              <td className="py-3 px-4 text-center">
-                                {row.days_remaining !== null ? (
-                                  <span className={`font-semibold ${
-                                    row.days_remaining < 0 ? 'text-red-700' : 'text-gray-700'
-                                  }`}>
-                                    {row.days_remaining < 0 ? 'Vencido' : `${row.days_remaining} días`}
-                                  </span>
-                                ) : 'N/A'}
-                              </td>
-                              <td className="py-3 px-4">
-                                {row.percentage !== null ? (
-                                  <div className="flex items-center gap-2">
-                                    <div className="flex-1 bg-gray-200 rounded-full h-4 overflow-hidden">
-                                      <div 
-                                        className={`h-full ${
-                                          row.status === 'rojo' ? 'bg-red-500' :
-                                          row.status === 'amarillo' ? 'bg-yellow-500' : 'bg-green-500'
-                                        }`}
-                                        style={{ width: `${Math.min(100, row.percentage)}%` }}
-                                      ></div>
-                                    </div>
-                                    <span className="text-xs font-semibold w-12 text-right">
-                                      {row.percentage.toFixed(0)}%
-                                    </span>
-                                  </div>
-                                ) : 'N/A'}
-                              </td>
-                              <td className="py-3 px-4 text-center">
-                                {row.status === 'rojo' && <span className="text-2xl">🔴</span>}
-                                {row.status === 'amarillo' && <span className="text-2xl">🟡</span>}
-                                {row.status === 'verde' && <span className="text-2xl">🟢</span>}
-                                {row.status === 'sin-ordenes' && <span className="text-gray-400">⚪</span>}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Leyenda */}
-                  <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <p className="text-sm text-gray-700 mb-2">
-                      <strong>📌 Nota:</strong> Este reporte muestra el seguimiento de mantenimientos por cliente:
-                    </p>
-                    <ul className="text-sm text-gray-700 list-disc ml-5 space-y-1">
-                      <li><strong>Última Orden:</strong> Fecha del último mantenimiento completado</li>
-                      <li><strong>Fecha Proyectada:</strong> 4 meses después del último mantenimiento</li>
-                      <li><strong>Días Restantes:</strong> Días hasta la fecha proyectada</li>
-                      <li><strong>🟢 Verde:</strong> Menos del 30% del tiempo transcurrido (cliente al día)</li>
-                      <li><strong>🟡 Amarillo:</strong> Entre 60% y 89% del tiempo transcurrido (próximo a vencer)</li>
-                      <li><strong>🔴 Rojo:</strong> 90% o más del tiempo transcurrido (urgente, contactar pronto)</li>
-                    </ul>
-                  </div>
-                </>
-              )}
             </div>
           )}
         </div>
