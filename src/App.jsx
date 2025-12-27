@@ -9,6 +9,7 @@ import Schedule from './components/Schedule';
 import Users from './components/Users';
 import Backup from './components/Backup';
 import Warehouses from './components/Warehouses';
+import Reports from './components/Reports';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -101,6 +102,7 @@ function App() {
     { view: 'clients', label: 'Clientes', icon: '👥', roles: ['admin', 'tecnico'] },
     { view: 'materials', label: 'Materiales', icon: '📦', roles: ['admin', 'tecnico'] },
     { view: 'warehouses', label: 'Bodegas', icon: '🏪', roles: ['admin', 'tecnico'] },
+    { view: 'reports', label: 'Reportes', icon: '📈', roles: ['admin'] },
     { view: 'users', label: 'Usuarios', icon: '👤', roles: ['admin'] },
     { view: 'backup', label: 'Respaldo', icon: '💾', roles: ['admin'] }
   ];
@@ -176,6 +178,7 @@ function App() {
           {currentView === 'clients' && <Clients token={token} apiUrl={API_URL} />}
           {currentView === 'materials' && <Materials token={token} apiUrl={API_URL} />}
           {currentView === 'warehouses' && <Warehouses token={token} apiUrl={API_URL} />}
+          {currentView === 'reports' && user?.role === 'admin' && <Reports token={token} apiUrl={API_URL} />}
           {currentView === 'users' && user?.role === 'admin' && <Users token={token} apiUrl={API_URL} />}
           {currentView === 'backup' && user?.role === 'admin' && <Backup token={token} apiUrl={API_URL} />}
         </main>
